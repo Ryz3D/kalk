@@ -1,0 +1,27 @@
+name: build
+on: [push]
+jobs:
+  build-unix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Compile
+        run: gcc -std=c2x -Wall -D UNIX hsolver.c -o ./hsolver -lm
+      - name: Upload binary
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: hsolver_unix
+          path: ./hsolver
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Compile
+        run: gcc -std=c2x -Wall -D WIN hsolver.c -o ./hsolver.exe -lm
+      - name: Upload binary
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: hsolver_win
+          path: ./hsolver.exe
