@@ -28,6 +28,9 @@ max: (2 ^ (32 * UINT32_MAX)) / 1
 #define KALK_CLEAR(pointer, size) memset(pointer, 0, size)
 #define KALK_MEMCOPY(dst, src, size) memcpy(dst, src, size)
 
+#define KALK_MIN(a, b) (((a) <= (b)) ? (a) : (b))
+#define KALK_MAX(a, b) (((a) >= (b)) ? (a) : (b))
+
 typedef enum kalk_number_flag {
     KALK_NUMBER_FLAG_NEGATIVE = 0,
     KALK_NUMBER_FLAG_COMPLEX = 0,
@@ -82,6 +85,30 @@ void kalk_number_free(kalk_number_t *num) {
     KALK_FREE(num);
 }
 
+uint64_t kalk_intlist_add_len(uint64_t a_bits, uint64_t b_bits) {
+    return KALK_MAX(a_bits, b_bits) + 1;
+}
+
+void kalk_intlist_add(uint32_t *a, uint32_t a_len, uint32_t *b, uint32_t b_len, uint32_t *c, uint32_t c_len) {
+    uint8_t carry;
+    for (uint32_t i = 0; i < c_len; i++) {
+        c[i] = 0;
+    }
+}
+
+uint64_t kalk_intlist_mul_len(uint64_t a_bits, uint64_t b_bits) {
+    return a_bits + b_bits;
+}
+
+void kalk_intlist_mul(uint32_t *a, uint32_t a_len, uint32_t *b, uint32_t b_len, uint32_t *c, uint32_t c_len) {
+    uint8_t carry;
+    // a binary 1 is equal to the other number shifted to this position added to the result
+    // len1+len2 should be allocated, iterate over b bits, if true add shifted a bits (all u32 in []) to result -> max. << is b MSB
+    for (uint32_t i = 0; i < c_len; i++) {
+        c[i] = 0;
+    }
+}
+
 kalk_number_t *kalk_number_strip_length(kalk_number_t *num) {
     uint32_t empty1;
     for (empty1 = 0; empty1 < num->length1; empty1++) {
@@ -100,13 +127,31 @@ kalk_number_t *kalk_number_strip_length(kalk_number_t *num) {
     }
     kalk_number_t *num2 = kalk_number_alloc(num->length1 - empty1, num->length2 - empty2);
     if (num2 == NULL) {
-        return NULL;
+        return num;
     }
     num2->flags = num->flags;
     num2->next = num->next;
     KALK_MEMCOPY(&num2->data, &num->data, num2->length1);
     KALK_MEMCOPY(&num2->data + num2->length1, &num->data + num->length1, num2->length2);
     kalk_number_free(num);
+    return num2;
+}
+
+kalk_number_t *kalk_number_reduce_divisor(kalk_number_t *num) {
+    // TODO: minimum of prime factors -> gcd
+    // kalk_number_free(num);
+    return num;
+}
+
+kalk_number_t *kalk_number_cleanup(kalk_number_t *num) {
+    kalk_number_t *num2 = kalk_number_strip_length(num);
+    if (num2 == NULL) {
+        return num;
+    }
+    num2 = kalk_number_reduce_divisor(num2);
+    if (num2 == NULL) {
+        return num;
+    }
     return num2;
 }
 
@@ -151,8 +196,11 @@ kalk_number_t *kalk_number_from_int(int64_t i) {
 }
 
 int64_t kalk_number_to_int(kalk_number_t *num) {
-    num = kalk_number_strip_length(num);
+    num = kalk_number_cleanup(num);
 
+    if (num == NULL) {
+        return 0;
+    }
     if (num->length2 > 2 || num->length1 == 0) {
         return 0;
     }
@@ -177,12 +225,18 @@ int64_t kalk_number_to_int(kalk_number_t *num) {
     return (num->flags & (1 << KALK_NUMBER_FLAG_NEGATIVE)) ? -(int64_t)i_abs : (int64_t)i_abs;
 }
 
+kalk_number_t *kalk_number_subtract_single(kalk_number_t *a, kalk_number_t *b);
+
 kalk_number_t *kalk_number_add_single(kalk_number_t *a, kalk_number_t *b) {
     // TODO: use effective_bits for length
     // TODO: respect fractions (same denominator)
-    // TODO: respect sign (total highest bit?)
     // TODO: strip length
 
+    // TODO: respect sign
+    //   a &  b -> a + b
+    //  -a &  b -> b - a
+    //   a & -b -> a - b
+    //  -a & -b -> -(a + b)
     uint32_t longest_length1 = a->length1 >= b->length1 ? a->length1 : b->length1;
     kalk_number_t *c = kalk_number_alloc(longest_length1, a->length2);
     if (c == NULL) {
@@ -194,6 +248,10 @@ kalk_number_t *kalk_number_add_single(kalk_number_t *a, kalk_number_t *b) {
         (&c->data)[i] = op1 + op2;
     }
     return c;
+}
+
+kalk_number_t *kalk_number_subtract_single(kalk_number_t *a, kalk_number_t *b) {
+    return NULL;
 }
 
 kalk_number_t *kalk_list_add(kalk_number_t *a, kalk_number_t *b) {
@@ -236,6 +294,9 @@ kalk_number_t *kalk_list_index(kalk_number_t *list, uint32_t index) {
 }
 
 void kalk_number_debug_print(kalk_number_t *num) {
+    if (num == NULL) {
+        printf("(num @ NULL)" ENDL);
+    }
     uint32_t i_abs = 0;
     uint8_t i_abs_valid = 0;
     double f_abs = 0;
