@@ -90,9 +90,20 @@ uint64_t kalk_intlist_add_len(uint64_t a_bits, uint64_t b_bits) {
 }
 
 void kalk_intlist_add(uint32_t *a, uint32_t a_len, uint32_t *b, uint32_t b_len, uint32_t *c, uint32_t c_len) {
-    uint8_t carry;
+    uint8_t carry = 0;
     for (uint32_t i = 0; i < c_len; i++) {
-        c[i] = 0;
+        uint32_t op1 = i < a_len ? a[i] : 0;
+        uint32_t op2 = i < b_len ? b[i] : 0;
+        c[i] = op1 + op2 + carry;
+        if (carry) {
+            if (c[i] <= op1) {
+                carry = 1;
+            }
+        } else {
+            if (c[i] < op1) {
+                carry = 1;
+            }
+        }
     }
 }
 
@@ -101,11 +112,33 @@ uint64_t kalk_intlist_mul_len(uint64_t a_bits, uint64_t b_bits) {
 }
 
 void kalk_intlist_mul(uint32_t *a, uint32_t a_len, uint32_t *b, uint32_t b_len, uint32_t *c, uint32_t c_len) {
-    uint8_t carry;
     // a binary 1 is equal to the other number shifted to this position added to the result
     // len1+len2 should be allocated, iterate over b bits, if true add shifted a bits (all u32 in []) to result -> max. << is b MSB
     for (uint32_t i = 0; i < c_len; i++) {
         c[i] = 0;
+    }
+
+
+    // TODO: test this with random values and binary output, especially left shift indices and merging
+    uint64_t left_shift = 0;
+    uint8_t carry = 0;
+    for (uint32_t i = 0; i < c_len; i++) {
+        uint32_t op1 = i < a_len ? a[i] : 0;
+        int64_t index_b1 = (int64_t)i - (int64_t)(left_shift / 32);
+        int64_t index_b2 = index_b1 - 1;
+        uint32_t op2 = ((index_b1 > 0 && index_b1 < b_len) ? (b[index_b1] << (left_shift % 32)) : 0) |
+                       ((index_b2 > 0 && index_b2 < b_len && left_shift % 32 != 0) ? (b[index_b2] >> (31 - left_shift % 32)) : 0);
+        // TODO: consider existing c[i]
+        c[i] = op1 + op2 + carry;
+        if (carry) {
+            if (c[i] <= op1) {
+                carry = 1;
+            }
+        } else {
+            if (c[i] < op1) {
+                carry = 1;
+            }
+        }
     }
 }
 
